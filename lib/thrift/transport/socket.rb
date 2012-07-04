@@ -67,15 +67,30 @@ module Thrift
         else
           len = 0
           start = Time.now
-          while Time.now - start < @timeout
-            rd, wr, = IO.select(nil, [@handle], nil, @timeout)
+          elapsed = 0
+          while elapsed < @timeout
+            rd, wr, err = IO.select([@handle], [@handle], [@handle], @timeout - elapsed)
+        
+            if err and not err.empty?
+               # for example the peer suddenly closed the connection
+              raise TransportException.new(TransportException::UNKNOWN, "Socket: error reported for socket by IO.select")
+            end
+
+            if rd and not rd.empty?
+              # for example you are re-using this connection and there is stale data in the read buffer
+              raise TransportException.new(TransportException::UNKNOWN, "Socket: bytes in read buffer at inappropriate time")
+            end
+
             if wr and not wr.empty?
-              len += @handle.write_nonblock(str[len..-1])
+              this_write = @handle.write_nonblock(str[len..-1])
+              len += this_write
               break if len >= str.length
             end
+
+            elapsed = Time.now - start
           end
           if len < str.length
-            raise TransportException.new(TransportException::TIMED_OUT, "Socket: Timed out writing #{str.length} bytes to #{@desc}")
+            raise TransportException.new(TransportException::TIMED_OUT, "Socket: Timed out writing #{str.length} (wrote #{len}) bytes to #{@desc}")
           else
             len
           end
@@ -136,3 +151,4 @@ module Thrift
     end
   end
 end
+
