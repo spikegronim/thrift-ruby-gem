@@ -67,9 +67,9 @@ module Thrift
         else
           len = 0
           start = Time.now
-          elapsed = 0
-          while elapsed < @timeout
-            rd, wr, err = IO.select([@handle], [@handle], [@handle], @timeout - elapsed)
+          timespent = 0
+          while timespent < @timeout
+            rd, wr, err = IO.select([@handle], [@handle], [@handle], @timeout - timespent)
         
             if err and not err.empty?
                # for example the peer suddenly closed the connection
@@ -87,7 +87,7 @@ module Thrift
               break if len >= str.length
             end
 
-            elapsed = Time.now - start
+            timespent = Time.now - start
           end
           if len < str.length
             raise TransportException.new(TransportException::TIMED_OUT, "Socket: Timed out writing #{str.length} (wrote #{len}) bytes to #{@desc}")
@@ -116,16 +116,30 @@ module Thrift
           # so we need to ensure we've waited long enough, but not too long
           start = Time.now
           timespent = 0
-          rd = loop do
-            rd, = IO.select([@handle], nil, nil, @timeout - timespent)
+          pieces = []
+          bytes_read = 0
+          while timespent < @timeout && bytes_read < sz
+            rd, wr, err = IO.select([@handle], nil, [@handle], @timeout - timespent)
+
+            if err and not err.empty?
+               # for example the peer suddenly closed the connection
+              raise TransportException.new(TransportException::UNKNOWN, "Socket: error reported for socket by IO.select")
+            end
+
+            if rd and not rd.empty?
+              # never assume you can read all of sz in one call to read
+              pieces << @handle.readpartial(sz - bytes_read)
+              bytes_read += pieces.last.length 
+            end
+
             timespent = Time.now - start
-            break rd if (rd and not rd.empty?) or timespent >= @timeout
           end
-          if rd.nil? or rd.empty?
-            raise TransportException.new(TransportException::TIMED_OUT, "Socket: Timed out reading #{sz} bytes from #{@desc}")
-          else
-            data = @handle.readpartial(sz)
+
+          data = pieces.reduce(&:+)
+          if data.length < sz
+            raise TransportException.new(TransportException::TIMED_OUT, "Socket: Timed out reading #{sz} bytes (got #{bytes_read} from #{@desc}")
           end
+          data
         end
       rescue TransportException => e
         # don't let this get caught by the StandardError handler
@@ -151,4 +165,3 @@ module Thrift
     end
   end
 end
-
