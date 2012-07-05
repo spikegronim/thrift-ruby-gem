@@ -129,7 +129,7 @@ module Thrift
             if rd and not rd.empty?
               # never assume you can read all of sz in one call to read
               pieces << @handle.readpartial(sz - bytes_read)
-              if not pieces.last
+              if pieces.last.nil?
                 raise TransportException.new(TransportException::NOT_OPEN, "EOF reading #{@desc}")
               end
               bytes_read += pieces.last.length 
@@ -139,7 +139,7 @@ module Thrift
           end
 
           data = pieces.reduce(&:+)
-          if not data || data.length < sz
+          if data.nil? || data.length < sz
             raise TransportException.new(TransportException::TIMED_OUT, "Socket: Timed out reading #{sz} bytes (got #{bytes_read} from #{@desc}")
           end
         end
@@ -151,7 +151,7 @@ module Thrift
         @handle = nil
         raise TransportException.new(TransportException::NOT_OPEN, e.message)
       end
-      if (data.nil? or data.length == 0)
+      if (data.nil? or data.length < sz)
         raise TransportException.new(TransportException::UNKNOWN, "Socket: Could not read #{sz} bytes from #{@desc}")
       end
       data
