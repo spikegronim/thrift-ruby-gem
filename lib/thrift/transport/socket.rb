@@ -129,7 +129,7 @@ module Thrift
             if rd and not rd.empty?
               # never assume you can read all of sz in one call to read
               pieces << @handle.readpartial(sz - bytes_read)
-              if pieces.last.nil?
+              if pieces.last.nil? || pieces.last.length == 0
                 raise TransportException.new(TransportException::NOT_OPEN, "EOF reading #{@desc}")
               end
               bytes_read += pieces.last.length 
