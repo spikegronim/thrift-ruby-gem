@@ -62,7 +62,7 @@ module Thrift
     def write(str)
       raise IOError, "closed stream" unless open?
       begin
-        if @timeout.nil? or @timeout == 0
+        if @timeout.nil? || @timeout == 0
           @handle.write(str)
         else
           len = 0
@@ -109,7 +109,7 @@ module Thrift
       raise IOError, "closed stream" unless open?
 
       begin
-        if @timeout.nil? or @timeout == 0
+        if @timeout.nil? || @timeout == 0
           data = @handle.readpartial(sz)
         else
           # it's possible to interrupt select for something other than the timeout
@@ -151,14 +151,14 @@ module Thrift
         @handle = nil
         raise TransportException.new(TransportException::NOT_OPEN, e.message)
       end
-      if (data.nil? or data.length < sz)
+      if (data.nil? || data.length < sz)
         raise TransportException.new(TransportException::UNKNOWN, "Socket: Could not read #{sz} bytes from #{@desc}")
       end
       data
     end
 
     def close
-      @handle.close unless @handle.nil? or @handle.closed?
+      @handle.close unless @handle.nil? || @handle.closed?
       @handle = nil
     end
 
